@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count, Sum, Avg
 from django.db.models.functions import Extract
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from authentication.permissions import SulamaYetkisiPermission
 from authentication.mixins import SulamaBazliMixin
 import shutil
@@ -14,16 +14,12 @@ from openpyxl import load_workbook
 from django.views.decorators.csrf import csrf_exempt
 import json
 import os
-from typing import Any, Dict, List, Optional, Union
 from .models import (
     Bolge, Sulama, DepolamaTesisi, Kanal, 
     GunlukSebekeyeAlinanSuMiktari, GunlukDepolamaTesisiSuMiktari,
     UrunKategorisi, Urun, YillikGenelSuTuketimi, YillikUrunDetay,
-    Makina, MakinaKonum, MakinaIs, KanalAbak, DepolamaTesisiAbak
+    Makina, MakinaKonum, MakinaIs
 )
-
-# Type checking için model sınıflarını import et
-from django.db import models
 from .serializers import (
     BolgeSerializer, SulamaSerializer, DepolamaTesisiSerializer, KanalSerializer,
     GunlukSebekeyeAlinanSuMiktariSerializer, GunlukDepolamaTesisiSuMiktariSerializer,
@@ -39,7 +35,7 @@ class BolgeViewSet(viewsets.ModelViewSet):
     """
     Bölge yönetimi ViewSet
     """
-    queryset = Bolge.objects.all()  # type: ignore
+    queryset = Bolge.objects.all()
     serializer_class = BolgeSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -54,7 +50,7 @@ class SulamaViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     Sulama sistemi yönetimi ViewSet
     Kullanıcı sadece yetkili olduğu sulama sistemlerini görebilir/yönetebilir
     """
-    queryset = Sulama.objects.select_related('bolge').all()  # type: ignore
+    queryset = Sulama.objects.select_related('bolge').all()
     serializer_class = SulamaSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -83,17 +79,17 @@ class SulamaViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
         
         istatistikler = {
             'depolama_tesisi_sayisi': sulama.depolama_tesisleri.count(),
-            'kanal_sayisi': Kanal.objects.filter(depolama_tesisi__sulama=sulama).count(),  # type: ignore
+            'kanal_sayisi': Kanal.objects.filter(depolama_tesisi__sulama=sulama).count(),
             'urun_sayisi': sulama.urunler.count(),
-            'toplam_yillik_alan': YillikGenelSuTuketimi.objects.filter(sulama=sulama).aggregate(  # type: ignore
+            'toplam_yillik_alan': YillikGenelSuTuketimi.objects.filter(sulama=sulama).aggregate(
                 toplam=Sum('alan'))['toplam'] or 0,
-            'toplam_yillik_tuketim': YillikGenelSuTuketimi.objects.filter(sulama=sulama).aggregate(  # type: ignore
+            'toplam_yillik_tuketim': YillikGenelSuTuketimi.objects.filter(sulama=sulama).aggregate(
                 toplam=Sum('su_tuketimi'))['toplam'] or 0,
         }
         
         # Son 7 günlük veri sayısı
         son_hafta = datetime.now().date() - timedelta(days=7)
-        istatistikler['son_hafta_veri_sayisi'] = GunlukSebekeyeAlinanSuMiktari.objects.filter(  # type: ignore
+        istatistikler['son_hafta_veri_sayisi'] = GunlukSebekeyeAlinanSuMiktari.objects.filter(
             kanal__depolama_tesisi__sulama=sulama, 
             tarih__gte=son_hafta
         ).count()
@@ -105,7 +101,7 @@ class DepolamaTesisiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Depolama tesisi ViewSet
     """
-    queryset = DepolamaTesisi.objects.select_related('sulama__bolge').all()  # type: ignore
+    queryset = DepolamaTesisi.objects.select_related('sulama__bolge').all()
     serializer_class = DepolamaTesisiSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -167,7 +163,7 @@ class KanalViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Kanal yönetimi ViewSet
     """
-    queryset = Kanal.objects.select_related('depolama_tesisi__sulama__bolge').all()  # type: ignore
+    queryset = Kanal.objects.select_related('depolama_tesisi__sulama__bolge').all()
     serializer_class = KanalSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -194,7 +190,7 @@ class KanalViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     def son_veriler(self, request, pk=None):
         """Kanalın son veri kayıtları"""
         kanal = self.get_object()
-        son_veriler = GunlukSebekeyeAlinanSuMiktari.objects.filter(  # type: ignore
+        son_veriler = GunlukSebekeyeAlinanSuMiktari.objects.filter(
             kanal=kanal
         ).order_by('-tarih', '-baslangic_saati')[:10]
         
@@ -227,7 +223,7 @@ class KanalViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
                     'su_hacmi': abak.hacim,
                     'success': True
                 })
-            except KanalAbak.DoesNotExist:  # type: ignore
+            except KanalAbak.DoesNotExist:
                 return Response({
                     'error': f'Bu kanal için {yukseklik} m yükseklik değeri abakta bulunamadı',
                     'kanal_id': kanal.id,
@@ -248,7 +244,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
     """
     Günlük şebekeye alınan su miktarı ViewSet
     """
-    queryset = GunlukSebekeyeAlinanSuMiktari.objects.select_related(  # type: ignore
+    queryset = GunlukSebekeyeAlinanSuMiktari.objects.select_related(
         'kanal__depolama_tesisi__sulama__bolge'
     ).all()
     serializer_class = GunlukSebekeyeAlinanSuMiktariSerializer
@@ -271,8 +267,8 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         
         if baslangic_tarih and bitis_tarih:
             try:
-                baslangic = datetime.strptime(str(baslangic_tarih), '%Y-%m-%d').date()
-                bitis = datetime.strptime(str(bitis_tarih), '%Y-%m-%d').date()
+                baslangic = datetime.strptime(baslangic_tarih, '%Y-%m-%d').date()
+                bitis = datetime.strptime(bitis_tarih, '%Y-%m-%d').date()
                 filtered_queryset = filtered_queryset.filter(tarih__gte=baslangic, tarih__lte=bitis)
             except ValueError:
                 pass  # Geçersiz tarih formatı durumunda varsayılan filtreleme
@@ -306,8 +302,8 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
             )
         
         try:
-            baslangic_tarih = datetime.strptime(str(baslangic), '%Y-%m-%d').date()
-            bitis_tarih = datetime.strptime(str(bitis), '%Y-%m-%d').date()
+            baslangic_tarih = datetime.strptime(baslangic, '%Y-%m-%d').date()
+            bitis_tarih = datetime.strptime(bitis, '%Y-%m-%d').date()
         except ValueError:
             return Response(
                 {'error': 'Geçersiz tarih formatı (YYYY-MM-DD kullanın)'}, 
@@ -349,7 +345,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         
         try:
             yukseklik = float(yukseklik)
-            kanal = Kanal.objects.get(id=kanal_id)  # type: ignore
+            kanal = Kanal.objects.get(id=kanal_id)
             
             # Yetki kontrolü
             if not self.check_sulama_permission(kanal.depolama_tesisi.sulama.id):
@@ -372,7 +368,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
                         'hesaplama_tipi': 'tam_eslesme',
                         'success': True
                     })
-                except KanalAbak.DoesNotExist:  # type: ignore
+                except KanalAbak.DoesNotExist:
                     # Tam eşleşme yoksa interpolasyon yap
                     abaklar = kanal.abaklar.all().order_by('yukseklik')
                     
@@ -439,7 +435,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
                     'success': False
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
-        except (ValueError, Kanal.DoesNotExist) as e:  # type: ignore
+        except (ValueError, Kanal.DoesNotExist) as e:
             return Response(
                 {'error': 'Geçersiz kanal veya yükseklik değeri'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -459,7 +455,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         
         try:
             yukseklik = float(yukseklik)
-            kanal = Kanal.objects.get(id=kanal_id)  # type: ignore
+            kanal = Kanal.objects.get(id=kanal_id)
             
             # Yetki kontrolü
             if not self.check_sulama_permission(kanal.depolama_tesisi.sulama.id):
@@ -482,7 +478,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
                         'hesaplama_tipi': 'tam_eslesme',
                         'success': True
                     })
-                except KanalAbak.DoesNotExist:  # type: ignore
+                except KanalAbak.DoesNotExist:
                     # Tam eşleşme yoksa interpolasyon yap
                     abaklar = kanal.abaklar.all().order_by('yukseklik')
                     
@@ -549,7 +545,7 @@ class GunlukSebekeyeAlinanSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
                     'success': False
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
-        except (ValueError, Kanal.DoesNotExist) as e:  # type: ignore
+        except (ValueError, Kanal.DoesNotExist) as e:
             return Response(
                 {'error': 'Geçersiz kanal veya yükseklik değeri'}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -560,7 +556,7 @@ class GunlukDepolamaTesisiSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
     """
     Günlük depolama tesisi su miktarı ViewSet
     """
-    queryset = GunlukDepolamaTesisiSuMiktari.objects.select_related(  # type: ignore
+    queryset = GunlukDepolamaTesisiSuMiktari.objects.select_related(
         'depolama_tesisi__sulama__bolge'
     ).all()
     serializer_class = GunlukDepolamaTesisiSuMiktariSerializer
@@ -583,8 +579,8 @@ class GunlukDepolamaTesisiSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         
         if baslangic_tarih and bitis_tarih:
             try:
-                baslangic = datetime.strptime(str(baslangic_tarih), '%Y-%m-%d').date()
-                bitis = datetime.strptime(str(bitis_tarih), '%Y-%m-%d').date()
+                baslangic = datetime.strptime(baslangic_tarih, '%Y-%m-%d').date()
+                bitis = datetime.strptime(bitis_tarih, '%Y-%m-%d').date()
                 filtered_queryset = filtered_queryset.filter(tarih__gte=baslangic, tarih__lte=bitis)
             except ValueError:
                 pass  # Geçersiz tarih formatı durumunda varsayılan filtreleme
@@ -614,7 +610,7 @@ class GunlukDepolamaTesisiSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         queryset = self.get_queryset()
         son_kayitlar = []
         
-        tesisler = DepolamaTesisi.objects.filter(  # type: ignore
+        tesisler = DepolamaTesisi.objects.filter(
             gunluk_depolama_tesisi_su_miktarlari__in=queryset
         ).distinct()
         
@@ -641,8 +637,8 @@ class GunlukDepolamaTesisiSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
         # Filtreleri uygula
         if baslangic_tarih and bitis_tarih:
             try:
-                baslangic = datetime.strptime(str(baslangic_tarih), '%Y-%m-%d').date()
-                bitis = datetime.strptime(str(bitis_tarih), '%Y-%m-%d').date()
+                baslangic = datetime.strptime(baslangic_tarih, '%Y-%m-%d').date()
+                bitis = datetime.strptime(bitis_tarih, '%Y-%m-%d').date()
                 queryset = queryset.filter(tarih__gte=baslangic, tarih__lte=bitis)
             except ValueError:
                 pass
@@ -651,7 +647,7 @@ class GunlukDepolamaTesisiSuMiktariViewSet(SulamaBazliMixin, viewsets.ModelViewS
             queryset = queryset.filter(depolama_tesisi=depolama_tesisi)
         
         # Belirtilen tarih aralığında her depolama tesisinin en son kaydını al
-        tesisler = DepolamaTesisi.objects.filter(  # type: ignore
+        tesisler = DepolamaTesisi.objects.filter(
             id__in=queryset.values_list('depolama_tesisi', flat=True).distinct()
         )
         
@@ -690,7 +686,7 @@ class UrunKategorisiViewSet(viewsets.ModelViewSet):
     """
     Ürün kategorisi ViewSet
     """
-    queryset = UrunKategorisi.objects.all()  # type: ignore
+    queryset = UrunKategorisi.objects.all()
     serializer_class = UrunKategorisiSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -706,7 +702,7 @@ class UrunViewSet(viewsets.ModelViewSet):
     Ürün yönetimi ViewSet
     Tüm ürünler tüm sulama sistemlerinde görünür
     """
-    queryset = Urun.objects.select_related('sulama__bolge').prefetch_related('kategori').all()  # type: ignore
+    queryset = Urun.objects.select_related('sulama__bolge').prefetch_related('kategori').all()
     serializer_class = UrunSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -736,7 +732,7 @@ class UrunViewSet(viewsets.ModelViewSet):
         """Ürünün yıllık tüketimleri"""
         urun = self.get_object()
         # Yeni model yapısında ürün detayları ayrı tabloda
-        urun_detaylari = YillikUrunDetay.objects.filter(urun=urun).select_related('yillik_tuketim__sulama').order_by('-yillik_tuketim__yil')  # type: ignore
+        urun_detaylari = YillikUrunDetay.objects.filter(urun=urun).select_related('yillik_tuketim__sulama').order_by('-yillik_tuketim__yil')
         serializer = YillikUrunDetaySerializer(urun_detaylari, many=True)
         return Response(serializer.data)
 
@@ -745,7 +741,7 @@ class YillikGenelSuTuketimiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Yıllık genel su tüketimi ViewSet
     """
-    queryset = YillikGenelSuTuketimi.objects.select_related(  # type: ignore
+    queryset = YillikGenelSuTuketimi.objects.select_related(
         'sulama__bolge'
     ).prefetch_related('urun_detaylari__urun').all()
     serializer_class = YillikGenelSuTuketimiSerializer
@@ -904,11 +900,11 @@ class YillikGenelSuTuketimiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
             # Sulama sisteminin varlığını ve yetkisini kontrol et
             try:
                 from .models import Sulama
-                sulama = Sulama.objects.get(id=sulama_id)  # type: ignore
+                sulama = Sulama.objects.get(id=sulama_id)
                 
                 # Yetki kontrolü - SulamaBazliMixin'deki filter_by_sulama_permission kullan
                 allowed_sulamalar = self.filter_by_sulama_permission(
-                    Sulama.objects.all(), 'id'  # type: ignore
+                    Sulama.objects.all(), 'id'
                 ).values_list('id', flat=True)
                 
                 if sulama_id not in allowed_sulamalar:
@@ -917,7 +913,7 @@ class YillikGenelSuTuketimiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
                         status=status.HTTP_403_FORBIDDEN
                     )
                     
-            except Sulama.DoesNotExist:  # type: ignore
+            except Sulama.DoesNotExist:
                 return Response(
                     {'error': 'Geçersiz sulama sistemi'}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -927,7 +923,7 @@ class YillikGenelSuTuketimiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
             self.get_queryset().filter(sulama=sulama, yil=yil).delete()
             
             # Ana kaydı oluştur
-            yillik_tuketim = YillikGenelSuTuketimi.objects.create(  # type: ignore
+            yillik_tuketim = YillikGenelSuTuketimi.objects.create(
                 yil=yil,
                 sulama=sulama,
                 ciftlik_randi=ciftlik_randi,
@@ -974,7 +970,7 @@ class YillikGenelSuTuketimiViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
                 )
             
             # Ürün detaylarını toplu kaydet
-            YillikUrunDetay.objects.bulk_create(urun_detaylari)  # type: ignore
+            YillikUrunDetay.objects.bulk_create(urun_detaylari)
             
             return Response({
                 'message': f'{len(urun_detaylari)} adet ürün detayı başarıyla kaydedildi',
@@ -1000,7 +996,7 @@ class YillikUrunDetayViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Yıllık ürün detay ViewSet
     """
-    queryset = YillikUrunDetay.objects.select_related(  # type: ignore
+    queryset = YillikUrunDetay.objects.select_related(
         'yillik_tuketim__sulama__bolge', 'urun'
     ).all()
     serializer_class = YillikUrunDetaySerializer
@@ -1044,9 +1040,9 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 yil = datetime.now().year
 
             # Base queryset'leri hazırla
-            sebeke_qs = GunlukSebekeyeAlinanSuMiktari.objects.filter(tarih__year=yil)  # type: ignore
-            depolama_qs = GunlukDepolamaTesisiSuMiktari.objects.filter(tarih__year=yil)  # type: ignore
-            tuketim_qs = YillikGenelSuTuketimi.objects.filter(yil=yil)  # type: ignore
+            sebeke_qs = GunlukSebekeyeAlinanSuMiktari.objects.filter(tarih__year=yil)
+            depolama_qs = GunlukDepolamaTesisiSuMiktari.objects.filter(tarih__year=yil)
+            tuketim_qs = YillikGenelSuTuketimi.objects.filter(yil=yil)
 
             # Depolama tesisi filtreleme (öncelik)
             if depolama_tesisi_id:
@@ -1056,9 +1052,9 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                     depolama_qs = depolama_qs.filter(depolama_tesisi_id=depolama_tesisi_id)
                     # Depolama tesisi seçilince o tesisin sulama sistemini al
                     try:
-                        depolama_tesisi = DepolamaTesisi.objects.get(id=depolama_tesisi_id)  # type: ignore
+                        depolama_tesisi = DepolamaTesisi.objects.get(id=depolama_tesisi_id)
                         tuketim_qs = tuketim_qs.filter(sulama_id=depolama_tesisi.sulama_id)
-                    except DepolamaTesisi.DoesNotExist:  # type: ignore
+                    except DepolamaTesisi.DoesNotExist:
                         pass
                 except (ValueError, TypeError):
                     pass
@@ -1122,7 +1118,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 aylik_depolama_kayit = 0
                 
                 # Yetkili depolama tesislerini al
-                yetkili_tesisler = DepolamaTesisi.objects.filter(  # type: ignore
+                yetkili_tesisler = DepolamaTesisi.objects.filter(
                     gunluk_depolama_tesisi_su_miktarlari__in=depolama_qs
                 ).distinct()
                 
@@ -1213,7 +1209,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
             if depolama_tesisi_id:
                 # Tek tesis seçiliyse, o tesisin maksimum kapasitesi
                 try:
-                    tesis = DepolamaTesisi.objects.get(id=depolama_tesisi_id)  # type: ignore
+                    tesis = DepolamaTesisi.objects.get(id=depolama_tesisi_id)
                     # DepolamaTesisi modelindeki maksimum_hacim alanını kullan
                     if tesis.maksimum_hacim:
                         toplam_depolama_kapasitesi = float(tesis.maksimum_hacim)
@@ -1223,7 +1219,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 # Tüm yetkili tesisler için maksimum kapasiteleri topla
                 # Yetki kontrolü ile tüm tesisleri al, sadece veri girişi yapılanları değil
                 yetkili_tesisler = self.filter_by_sulama_permission(
-                    DepolamaTesisi.objects.all(), 'sulama'  # type: ignore
+                    DepolamaTesisi.objects.all(), 'sulama'
                 ).distinct()
                 
                 for tesis in yetkili_tesisler:
@@ -1278,7 +1274,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 yil = datetime.now().year
 
             # Depolama verilerini al
-            depolama_qs = GunlukDepolamaTesisiSuMiktari.objects.filter(tarih__year=yil)  # type: ignore
+            depolama_qs = GunlukDepolamaTesisiSuMiktari.objects.filter(tarih__year=yil)
             
             # Depolama tesisi filtreleme
             if depolama_tesisi_id:
@@ -1310,7 +1306,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 
                 # Yetkili depolama tesislerini al
                 yetkili_tesisler = self.filter_by_sulama_permission(
-                    DepolamaTesisi.objects.all(), 'sulama'  # type: ignore
+                    DepolamaTesisi.objects.all(), 'sulama'
                 ).distinct()
                 
                 for tesis in yetkili_tesisler:
@@ -1383,7 +1379,7 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                 yil = datetime.now().year
 
             # Base queryset - YillikUrunDetay'dan veri al
-            urun_detay_qs = YillikUrunDetay.objects.filter(yillik_tuketim__yil=yil).select_related('urun', 'yillik_tuketim__sulama')  # type: ignore
+            urun_detay_qs = YillikUrunDetay.objects.filter(yillik_tuketim__yil=yil).select_related('urun', 'yillik_tuketim__sulama')
 
             # Depolama tesisi filtreleme (öncelik)
             if depolama_tesisi_id:
@@ -1391,9 +1387,9 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
                     depolama_tesisi_id = int(depolama_tesisi_id)
                     # Depolama tesisi seçilince o tesisin sulama sistemini al
                     try:
-                        depolama_tesisi = DepolamaTesisi.objects.get(id=depolama_tesisi_id)  # type: ignore
+                        depolama_tesisi = DepolamaTesisi.objects.get(id=depolama_tesisi_id)
                         urun_detay_qs = urun_detay_qs.filter(yillik_tuketim__sulama_id=depolama_tesisi.sulama_id)
-                    except DepolamaTesisi.DoesNotExist:  # type: ignore
+                    except DepolamaTesisi.DoesNotExist:
                         pass
                 except (ValueError, TypeError):
                     pass
@@ -1506,17 +1502,17 @@ class DashboardViewSet(SulamaBazliMixin, viewsets.ViewSet):
         """
         try:
             # Şebeke su verilerinde hangi yıllar var
-            sebeke_yillar = GunlukSebekeyeAlinanSuMiktari.objects.values_list(  # type: ignore
+            sebeke_yillar = GunlukSebekeyeAlinanSuMiktari.objects.values_list(
                 'tarih__year', flat=True
             ).distinct().order_by('tarih__year')
             
             # Depolama su verilerinde hangi yıllar var
-            depolama_yillar = GunlukDepolamaTesisiSuMiktari.objects.values_list(  # type: ignore
+            depolama_yillar = GunlukDepolamaTesisiSuMiktari.objects.values_list(
                 'tarih__year', flat=True
             ).distinct().order_by('tarih__year')
             
             # Tüketim verilerinde hangi yıllar var
-            tuketim_yillar = YillikGenelSuTuketimi.objects.values_list(  # type: ignore
+            tuketim_yillar = YillikGenelSuTuketimi.objects.values_list(
                 'yil', flat=True
             ).distinct().order_by('yil')
             
@@ -1556,23 +1552,20 @@ def export_to_excel_with_template(request):
         shutil.copy(template_path, temp_path)
         wb = load_workbook(temp_path)
         ws = wb.active
-        if ws is None:
-            return JsonResponse({"error": "Excel worksheet oluşturulamadı"}, status=400)
 
         ws["A1"] = f"{yil} {kurum_adi} {sulama_adi} {genel_adi}"
 
         start_row = 4
         for i, row in enumerate(tableData, start=start_row):
-            if row is not None:
-                ws[f"A{i}"] = row.get("urun", "")
-                ws[f"B{i}"] = row.get("ekim_alani", "")
-                ws[f"C{i}"] = row.get("ekim_orani", "")
-                ur_values = row.get("ur_values", [])
-                for j, val in enumerate(ur_values):
-                    col_letter = chr(ord("D") + j)
-                    ws[f"{col_letter}{i}"] = val
-                ws[f"P{i}"] = row.get("toplam_ur", "")
-                ws[f"Q{i}"] = row.get("su_tuketimi", "")
+            ws[f"A{i}"] = row.get("urun", "")
+            ws[f"B{i}"] = row.get("ekim_alani", "")
+            ws[f"C{i}"] = row.get("ekim_orani", "")
+            ur_values = row.get("ur_values", [])
+            for j, val in enumerate(ur_values):
+                col_letter = chr(ord("D") + j)
+                ws[f"{col_letter}{i}"] = val
+            ws[f"P{i}"] = row.get("toplam_ur", "")
+            ws[f"Q{i}"] = row.get("su_tuketimi", "")
 
         result_labels = [
             ("NET SU İHTİYACI (hm³)", results.get("net_su_aylik", []), results.get("net_su_toplam", "")),
@@ -1582,10 +1575,9 @@ def export_to_excel_with_template(request):
         for offset, (label, aylik, toplam) in enumerate(result_labels):
             result_row = start_row + len(tableData) + 2 + offset
             ws[f"A{result_row}"] = label
-            if aylik is not None:
-                for j, val in enumerate(aylik):
-                    col_letter = chr(ord("D") + j)
-                    ws[f"{col_letter}{result_row}"] = val
+            for j, val in enumerate(aylik):
+                col_letter = chr(ord("D") + j)
+                ws[f"{col_letter}{result_row}"] = val
             ws[f"P{result_row}"] = toplam
 
         from io import BytesIO
@@ -1610,7 +1602,7 @@ class MakinaViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Makina yönetimi ViewSet
     """
-    queryset = Makina.objects.select_related('sulama__bolge').all()  # type: ignore
+    queryset = Makina.objects.select_related('sulama__bolge').all()
     serializer_class = MakinaSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -1688,7 +1680,7 @@ class MakinaKonumViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Makina konum takibi ViewSet
     """
-    queryset = MakinaKonum.objects.select_related('makina__sulama__bolge').all()  # type: ignore
+    queryset = MakinaKonum.objects.select_related('makina__sulama__bolge').all()
     serializer_class = MakinaKonumSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -1719,7 +1711,7 @@ class MakinaKonumViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
                 motor_calisma = veri.get('motor_calisma', True)
                 
                 if makina_id and enlem and boylam:
-                    MakinaKonum.objects.create(  # type: ignore
+                    MakinaKonum.objects.create(
                         makina_id=makina_id,
                         enlem=enlem,
                         boylam=boylam
@@ -1743,7 +1735,7 @@ class MakinaIsViewSet(SulamaBazliMixin, viewsets.ModelViewSet):
     """
     Makina iş takibi ViewSet
     """
-    queryset = MakinaIs.objects.select_related('makina__sulama__bolge').all()  # type: ignore
+    queryset = MakinaIs.objects.select_related('makina__sulama__bolge').all()
     serializer_class = MakinaIsSerializer
     permission_classes = [SulamaYetkisiPermission]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
