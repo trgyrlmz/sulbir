@@ -96,9 +96,9 @@ WSGI_APPLICATION = "sulama_project.wsgi.application"
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'sulama_db',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres123',
+        'NAME': 'sulama_db_prod',
+        'USER': 'sulama_user',
+        'PASSWORD': 'Ardahan91185',
         'HOST': 'db',
         'PORT': '5432',
     }

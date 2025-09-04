@@ -35,7 +35,7 @@ export default function MakinaDetayPaneli({ makina, onClose, onEdit, onDelete, o
 
             console.log('✅ Makina ID:', makina.id);
             console.log('✅ Makina objesi:', makina);
-            console.log('✅ Token:', token ? 'Mevcut' : 'Yok');
+            console.log('✅ Token:', token ? 'Mevcut' : 'Yok 1');
             
             // API URL'ini düzelt - makina ID'sini doğru şekilde gönder
             const apiUrl = `http://localhost:8001/api/sulama/makina-isler/?makina=${makina.id}`;

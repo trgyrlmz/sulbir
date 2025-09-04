@@ -36,9 +36,9 @@ export default function MakinaDetayPaneli({ makina, onClose, onEdit, onDelete, o
             console.log('✅ Makina ID:', makina.id);
             console.log('✅ Makina objesi:', makina);
             console.log('✅ Token:', token ? 'Mevcut' : 'Yok');
-            
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
             // API URL'ini düzelt - makina ID'sini doğru şekilde gönder
-            const apiUrl = `http://localhost:8001/api/sulama/makina-isler/?makina=${makina.id}`;
+            const apiUrl = `${API_BASE_URL}/api/sulama/makina-isler/?makina=${makina.id}`;
             console.log('🌐 API URL:', apiUrl);
             
             console.log('📡 API çağrısı yapılıyor...');
@@ -162,7 +162,10 @@ export default function MakinaDetayPaneli({ makina, onClose, onEdit, onDelete, o
             }
 
             // İşi tamamla
-            const response = await fetch(`http://localhost:8001/api/sulama/makina-isler/${aktifIs.id}/is_tamamla/`, {
+            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
+
+
+            const response = await fetch(`${API_BASE_URL}/api/sulama/makina-isler/${aktifIs.id}/is_tamamla/`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Token ${token}`,
